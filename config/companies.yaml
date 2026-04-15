@@ -1,0 +1,64 @@
+# Company Watchlist Configuration
+# Define target companies and their priority levels
+
+companies:
+  # Top Priority Companies (Priority: 5)
+  - name: "Example Company A"
+    priority: 5
+    ats_type: "greenhouse"
+    careers_url: "https://example-a.com/careers"
+    locations:
+      - "New York"
+      - "Remote"
+    notes: "Strong technical team, product-driven"
+
+  - name: "Example Company B"
+    priority: 5
+    ats_type: "lever"
+    careers_url: "https://example-b.com/jobs"
+    locations:
+      - "New York"
+    notes: "ML infrastructure focus"
+
+  # High Priority Companies (Priority: 4)
+  - name: "Example Company C"
+    priority: 4
+    ats_type: "ashby"
+    careers_url: "https://example-c.com/careers"
+    locations:
+      - "Remote"
+    notes: "Platform engineering team"
+
+  # Moderate Priority Companies (Priority: 3)
+  - name: "Example Company D"
+    priority: 3
+    ats_type: "greenhouse"
+    careers_url: "https://example-d.com/careers"
+    locations:
+      - "New York"
+      "Remote"
+    notes: "Solid infrastructure team"
+
+  # Backup Companies (Priority: 2)
+  - name: "Example Company E"
+    priority: 2
+    ats_type: "workday"
+    careers_url: "https://example-e.com/careers"
+    locations:
+      - "New York"
+    notes: "Enterprise backend role"
+
+# Priority Levels:
+# 5 = Top target company
+# 4 = Strong target
+# 3 = Solid company, moderate excitement
+# 2 = Backup
+# 1 = Low priority
+
+# ATS Types:
+# greenhouse - Greenhouse ATS
+# lever - Lever ATS
+# ashby - Ashby ATS
+# workday - Workday ATS
+# manual - Manual careers page
+# other - Other ATS

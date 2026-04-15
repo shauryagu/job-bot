@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/database/*.db
+data/database/*.sqlite
+data/database/*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Cache
+data/cache/
+__pycache__/
+*.cache
+
+# Uploads
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Exports
+data/exports/*
+!data/exports/.gitkeep
+
+# Credentials and Secrets
+config/credentials.json
+config/token.json
+*.pem
+*.key
+secrets/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Playwright
+.playwright/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
