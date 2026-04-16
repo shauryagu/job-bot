@@ -6,14 +6,15 @@ Shared fixtures and configuration for pytest tests.
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
-from app.main import app
+from main import app
 from app.db.base import Base
+from app.models import job, application, contact, outreach, profile, tracker
 
 
 # Test database URL
-TEST_DATABASE_URL = "sqlite:///./test.db"
+TEST_DATABASE_URL = "sqlite:///:memory:"
 
 # Create test engine
 test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
@@ -22,7 +23,7 @@ test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread"
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def db_session():
     """
     Create a test database session.
@@ -43,12 +44,29 @@ def db_session():
         Base.metadata.drop_all(bind=test_engine)
 
 
-@pytest.fixture
-def client():
+@pytest.fixture(scope="function")
+def client(db_session):
     """
-    Create a test client for FastAPI.
+    Create a test client for FastAPI with database session.
+
+    Args:
+        db_session: Database session fixture
 
     Yields:
         Test client
     """
-    return TestClient(app)
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    # Override the dependency
+    from app.db import session as db_session_module
+    app.dependency_overrides[db_session_module.get_db] = override_get_db
+
+    try:
+        yield TestClient(app)
+    finally:
+        # Clean up override
+        app.dependency_overrides.clear()

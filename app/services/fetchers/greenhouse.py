@@ -60,10 +60,15 @@ class GreenhouseFetcher(BaseFetcher):
         Returns:
             Normalized job data
         """
+        metadata = raw_job.get("metadata", [])
+        company = ""
+        if metadata and isinstance(metadata, list) and len(metadata) > 0:
+            company = metadata[0].get("company", "")
+
         return {
             "source": "greenhouse",
             "source_job_id": str(raw_job.get("id")),
-            "company": raw_job.get("metadata", []).get("company", ""),
+            "company": company,
             "title": raw_job.get("title"),
             "location_raw": raw_job.get("location", {}).get("name"),
             "description_raw": raw_job.get("content"),

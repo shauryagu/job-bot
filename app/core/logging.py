@@ -74,3 +74,16 @@ def setup_logging() -> logging.Logger:
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
 
     return logger
+
+
+def get_logger(name: str) -> logging.Logger:
+    """
+    Get a logger instance for a specific module.
+
+    Args:
+        name: Module name (typically __name__)
+
+    Returns:
+        Logger instance
+    """
+    return logger.bind(name=name)

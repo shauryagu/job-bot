@@ -8,6 +8,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.tracker import TrackerEntry
+from app.core.logging import get_logger
+from app.core.exceptions import DatabaseException
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -47,17 +51,21 @@ async def get_tracker_data(
     Returns:
         Tracker data
     """
-    entries = (
-        db.query(TrackerEntry)
-        .order_by(TrackerEntry.last_touched.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    try:
+        entries = (
+            db.query(TrackerEntry)
+            .order_by(TrackerEntry.last_touched.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
 
-    return {
-        "entries": entries,
-        "total": len(entries),
-        "limit": limit,
-        "offset": offset,
-    }
+        return {
+            "entries": entries,
+            "total": len(entries),
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get tracker data: {e}")
+        raise DatabaseException(f"Database error: {str(e)}")

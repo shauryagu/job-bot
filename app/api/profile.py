@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.profile import UserProfile
 from app.schemas.profile import ProfileResponse, ProfileUpdate
+from app.core.logging import get_logger
+from app.core.exceptions import DatabaseException
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -24,13 +28,19 @@ async def get_profile(db: Session = Depends(get_db)):
     Returns:
         User profile
     """
-    # For now, return the first profile (will be updated with auth)
-    profile = db.query(UserProfile).first()
+    try:
+        # For now, return the first profile (will be updated with auth)
+        profile = db.query(UserProfile).first()
 
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
 
-    return profile
+        return profile
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get profile: {e}")
+        raise DatabaseException(f"Database error: {str(e)}")
 
 
 @router.put("/", response_model=ProfileResponse)
@@ -48,32 +58,38 @@ async def update_profile(
     Returns:
         Updated profile
     """
-    profile = db.query(UserProfile).first()
+    try:
+        profile = db.query(UserProfile).first()
 
-    if not profile:
-        # Create new profile if none exists
-        profile = UserProfile(
-            full_name=profile_update.full_name,
-            email=profile_update.email,
-            phone=profile_update.phone,
-            linkedin=profile_update.linkedin,
-            github=profile_update.github,
-        )
-        db.add(profile)
-    else:
-        # Update existing profile
-        if profile_update.full_name:
-            profile.full_name = profile_update.full_name
-        if profile_update.email:
-            profile.email = profile_update.email
-        if profile_update.phone:
-            profile.phone = profile_update.phone
-        if profile_update.linkedin:
-            profile.linkedin = profile_update.linkedin
-        if profile_update.github:
-            profile.github = profile_update.github
+        if not profile:
+            # Create new profile if none exists
+            profile = UserProfile(
+                full_name=profile_update.full_name,
+                email=profile_update.email,
+                phone=profile_update.phone,
+                linkedin=profile_update.linkedin,
+                github=profile_update.github,
+            )
+            db.add(profile)
+        else:
+            # Update existing profile
+            if profile_update.full_name:
+                profile.full_name = profile_update.full_name
+            if profile_update.email:
+                profile.email = profile_update.email
+            if profile_update.phone:
+                profile.phone = profile_update.phone
+            if profile_update.linkedin:
+                profile.linkedin = profile_update.linkedin
+            if profile_update.github:
+                profile.github = profile_update.github
 
-    db.commit()
-    db.refresh(profile)
+        db.commit()
+        db.refresh(profile)
 
-    return profile
+        logger.info("Profile updated successfully")
+        return profile
+    except Exception as e:
+        logger.error(f"Failed to update profile: {e}")
+        db.rollback()
+        raise DatabaseException(f"Database error: {str(e)}")

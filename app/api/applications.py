@@ -7,9 +7,15 @@ Handles application-related API endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime
 from app.db.session import get_db
-from app.models.application import Application
+from app.models.application import Application, ApplicationStage
+from app.models.job import JobNormalized
 from app.schemas.applications import ApplicationResponse, ApplicationCreate, ApplicationStatusUpdate
+from app.core.logging import get_logger
+from app.core.exceptions import DatabaseException
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -31,15 +37,19 @@ async def get_applications(
     Returns:
         List of applications
     """
-    applications = (
-        db.query(Application)
-        .order_by(Application.date_applied.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    try:
+        applications = (
+            db.query(Application)
+            .order_by(Application.date_applied.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
 
-    return applications
+        return applications
+    except Exception as e:
+        logger.error(f"Failed to get applications: {e}")
+        raise DatabaseException(f"Database error: {str(e)}")
 
 
 @router.get("/{application_id}", response_model=ApplicationResponse)
@@ -54,14 +64,20 @@ async def get_application(application_id: int, db: Session = Depends(get_db)):
     Returns:
         Application details
     """
-    application = (
-        db.query(Application).filter(Application.id == application_id).first()
-    )
+    try:
+        application = (
+            db.query(Application).filter(Application.id == application_id).first()
+        )
 
-    if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
+        if not application:
+            raise HTTPException(status_code=404, detail="Application not found")
 
-    return application
+        return application
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get application {application_id}: {e}")
+        raise DatabaseException(f"Database error: {str(e)}")
 
 
 @router.post("/", response_model=ApplicationResponse)
@@ -79,20 +95,40 @@ async def create_application(
     Returns:
         Created application
     """
-    # TODO: Implement application creation logic
-    new_application = Application(
-        normalized_job_id=application.job_id,
-        company=application.company,
-        role=application.role,
-        resume_version=application.resume_version,
-        notes=application.notes,
-    )
+    try:
+        # Validate job exists
+        job = db.query(JobNormalized).filter(JobNormalized.id == application.job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
 
-    db.add(new_application)
-    db.commit()
-    db.refresh(new_application)
+        # Create application with proper defaults
+        new_application = Application(
+            normalized_job_id=application.job_id,
+            company=application.company,
+            role=application.role,
+            application_url=job.url if hasattr(job, 'url') else None,
+            source=job.source if hasattr(job, 'source') else None,
+            date_found=job.created_at if hasattr(job, 'created_at') else datetime.utcnow(),
+            date_applied=datetime.utcnow(),
+            resume_version=application.resume_version,
+            notes=application.notes,
+            stage=ApplicationStage.APPLIED,
+            last_touched=datetime.utcnow(),
+        )
 
-    return new_application
+        db.add(new_application)
+        db.commit()
+        db.refresh(new_application)
+
+        logger.info(f"Created application for job {application.job_id}")
+        return new_application
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create application: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create application")
 
 
 @router.put("/{application_id}/status")
@@ -112,17 +148,26 @@ async def update_application_status(
     Returns:
         Updated application
     """
-    application = (
-        db.query(Application).filter(Application.id == application_id).first()
-    )
+    try:
+        application = (
+            db.query(Application).filter(Application.id == application_id).first()
+        )
 
-    if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
+        if not application:
+            raise HTTPException(status_code=404, detail="Application not found")
 
-    application.stage = status_update.stage
-    application.next_action = status_update.next_action
-    application.follow_up_due = status_update.follow_up_due
+        application.stage = status_update.stage
+        application.next_action = status_update.next_action
+        application.follow_up_due = status_update.follow_up_due
+        application.last_touched = datetime.utcnow()
 
-    db.commit()
+        db.commit()
 
-    return {"message": "Application status updated successfully", "application_id": application_id}
+        logger.info(f"Updated status for application {application_id}")
+        return {"message": "Application status updated successfully", "application_id": application_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update application status {application_id}: {e}")
+        db.rollback()
+        raise DatabaseException(f"Database error: {str(e)}")

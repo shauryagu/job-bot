@@ -11,6 +11,10 @@ from app.db.session import get_db
 from app.models.outreach import Outreach
 from app.models.contact import Contact
 from app.schemas.outreach import OutreachResponse, OutreachDraftRequest
+from app.core.logging import get_logger
+from app.core.exceptions import DatabaseException
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -27,9 +31,12 @@ async def get_contacts_for_company(company: str, db: Session = Depends(get_db)):
     Returns:
         List of contacts
     """
-    contacts = db.query(Contact).filter(Contact.company == company).all()
-
-    return contacts
+    try:
+        contacts = db.query(Contact).filter(Contact.company == company).all()
+        return contacts
+    except Exception as e:
+        logger.error(f"Failed to get contacts for company {company}: {e}")
+        raise DatabaseException(f"Database error: {str(e)}")
 
 
 @router.post("/generate")
@@ -69,10 +76,16 @@ async def mark_outreach_sent(outreach_id: int, db: Session = Depends(get_db)):
     Returns:
         Updated outreach
     """
-    outreach = db.query(Outreach).filter(Outreach.id == outreach_id).first()
+    try:
+        outreach = db.query(Outreach).filter(Outreach.id == outreach_id).first()
 
-    if not outreach:
-        raise HTTPException(status_code=404, detail="Outreach not found")
+        if not outreach:
+            raise HTTPException(status_code=404, detail="Outreach not found")
 
-    # TODO: Mark as sent and update timestamp
-    return {"message": "Outreach marked as sent", "outreach_id": outreach_id}
+        # TODO: Mark as sent and update timestamp
+        return {"message": "Outreach marked as sent", "outreach_id": outreach_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to mark outreach {outreach_id} as sent: {e}")
+        raise DatabaseException(f"Database error: {str(e)}")
