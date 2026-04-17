@@ -10,7 +10,13 @@ from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 from main import app
 from app.db.base import Base
-from app.models import job, application, contact, outreach, profile, tracker
+# Import model classes to register them with SQLAlchemy Base metadata
+from app.models.job import JobRaw, JobNormalized
+from app.models.application import Application
+from app.models.profile import UserProfile
+from app.models.tracker import TrackerEntry
+from app.models.contact import Contact
+from app.models.outreach import Outreach
 
 
 # Test database URL

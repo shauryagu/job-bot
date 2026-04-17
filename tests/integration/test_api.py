@@ -8,9 +8,13 @@ import pytest
 from datetime import datetime
 from fastapi.testclient import TestClient
 from main import app
-from app.models.job import JobNormalized, JobStatus
+# Import all models to ensure they're registered with SQLAlchemy
+from app.models.job import JobRaw, JobNormalized, JobStatus
 from app.models.application import Application, ApplicationStage
 from app.models.profile import UserProfile
+from app.models.tracker import TrackerEntry
+from app.models.contact import Contact
+from app.models.outreach import Outreach
 
 
 class TestHealthEndpoints:

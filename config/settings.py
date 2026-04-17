@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # Job Fetching
     fetch_interval_hours: int = Field(default=6, description="Job fetch interval in hours")
     max_jobs_per_source: int = Field(default=100, description="Maximum jobs per source")
+    fetch_timeout_seconds: int = Field(default=30, description="Timeout for fetch requests")
+    fetch_max_retries: int = Field(default=3, description="Max retries for failed requests")
+    deduplication_enabled: bool = Field(default=True, description="Enable/disable deduplication")
+    deduplication_window_days: int = Field(default=30, description="Time window for duplicate detection")
 
     # User Preferences
     default_location: str = Field(default="New York", description="Default location")

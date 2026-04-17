@@ -7,13 +7,15 @@ Handles job-related API endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.db.session import get_db
 from app.models.job import JobRaw, JobNormalized, JobStatus
-from app.schemas.jobs import JobResponse, JobListResponse, JobFetchRequest
+from app.schemas.jobs import JobResponse, JobListResponse, JobFetchRequest, JobFetchResponse, JobFetchSourceResult
 from app.services.fetchers.factory import FetcherFactory
 from app.core.logging import get_logger
-from app.core.exceptions import DatabaseException
+from app.core.exceptions import DatabaseException, ExternalAPIException, RateLimitException
+from app.core.config import settings, get_companies_by_ats_type, get_company_config
+import time
 
 logger = get_logger(__name__)
 
@@ -153,7 +155,7 @@ async def reject_job(job_id: int, db: Session = Depends(get_db)):
         raise DatabaseException(f"Database error: {str(e)}")
 
 
-@router.post("/fetch")
+@router.post("/fetch", response_model=JobFetchResponse)
 async def fetch_jobs(request: JobFetchRequest, db: Session = Depends(get_db)):
     """
     Fetch jobs from configured sources.
@@ -163,53 +165,142 @@ async def fetch_jobs(request: JobFetchRequest, db: Session = Depends(get_db)):
         db: Database session
 
     Returns:
-        Fetch results
+        Fetch results with per-source statistics
     """
-    try:
-        total_fetched = 0
-        fetched_jobs = []
+    start_time = time.time()
+    total_fetched = 0
+    total_skipped = 0
+    source_results = []
 
+    try:
         for source in request.sources:
+            source_result = JobFetchSourceResult(source=source)
+
             try:
                 fetcher = FetcherFactory.get_fetcher(source)
                 logger.info(f"Fetching jobs from {source}")
 
-                # For now, we'll use a default company name
-                # In production, this would come from request or config
-                raw_jobs = await fetcher.fetch_jobs(company="example", limit=100)
+                # Get companies for this ATS type
+                companies = get_companies_by_ats_type(source)
 
-                for raw_job in raw_jobs:
-                    # Create JobRaw entry
-                    job_raw = JobRaw(
-                        source=source,
-                        source_job_id=raw_job.get("source_job_id", ""),
-                        raw_data=raw_job,
-                        fetched_at=datetime.utcnow(),
-                    )
-                    db.add(job_raw)
-                    fetched_jobs.append(raw_job)
-                    total_fetched += 1
+                if not companies:
+                    logger.warning(f"No companies configured for {source}")
+                    source_result.errors.append(f"No companies configured for {source}")
+                    source_results.append(source_result)
+                    continue
 
-                logger.info(f"Fetched {len(raw_jobs)} jobs from {source}")
+                # If specific companies requested, filter
+                if request.companies:
+                    companies = [c for c in companies if c["name"] in request.companies]
+
+                if not companies:
+                    logger.warning(f"No matching companies for {source} with specified companies")
+                    source_result.errors.append(f"No matching companies for {source}")
+                    source_results.append(source_result)
+                    continue
+
+                # Fetch jobs for each company
+                for company_config in companies:
+                    company_name = company_config.get("name")
+                    company_slug = company_name.lower().replace(" ", "-")
+
+                    try:
+                        raw_jobs = await fetcher.fetch_jobs(
+                            company=company_slug,
+                            limit=settings.max_jobs_per_source
+                        )
+
+                        for raw_job in raw_jobs:
+                            # Normalize job data
+                            normalized_job = fetcher.normalize_job(raw_job)
+
+                            # Check for duplicates
+                            source_job_id = normalized_job.get("source_job_id", "")
+                            existing_job = db.query(JobRaw).filter(
+                                JobRaw.source == source,
+                                JobRaw.source_job_id == source_job_id
+                            ).first()
+
+                            if existing_job:
+                                if request.force_refresh:
+                                    # Update existing job
+                                    existing_job.raw_data = raw_job
+                                    existing_job.fetched_at = datetime.utcnow()
+                                    logger.debug(f"Updated existing job {source_job_id}")
+                                else:
+                                    total_skipped += 1
+                                    logger.debug(f"Skipped duplicate job {source_job_id}")
+                                    continue
+
+                            # Create JobRaw entry
+                            job_raw = JobRaw(
+                                source=source,
+                                source_job_id=source_job_id,
+                                company=normalized_job.get("company", company_name),
+                                title=normalized_job.get("title", ""),
+                                location_raw=normalized_job.get("location_raw", ""),
+                                description_raw=normalized_job.get("description_raw", ""),
+                                url=normalized_job.get("url", ""),
+                                date_posted_raw=normalized_job.get("date_posted_raw", ""),
+                                ats_type=normalized_job.get("ats_type", source),
+                                metadata_json=normalized_job.get("metadata_json", ""),
+                                fetched_at=datetime.utcnow(),
+                            )
+                            db.add(job_raw)
+                            total_fetched += 1
+
+                        source_result.success_count += len(raw_jobs)
+                        logger.info(f"Fetched {len(raw_jobs)} jobs from {source} for {company_name}")
+
+                    except RateLimitException as e:
+                        logger.warning(f"Rate limit exceeded for {source} - {company_name}: {e}")
+                        source_result.failure_count += 1
+                        source_result.errors.append(f"Rate limit exceeded for {company_name}")
+                        continue
+
+                    except ExternalAPIException as e:
+                        logger.error(f"External API error for {source} - {company_name}: {e}")
+                        source_result.failure_count += 1
+                        source_result.errors.append(f"API error for {company_name}: {str(e)}")
+                        continue
+
+                    except Exception as e:
+                        logger.error(f"Failed to fetch jobs from {source} for {company_name}: {e}")
+                        source_result.failure_count += 1
+                        source_result.errors.append(f"Error for {company_name}: {str(e)}")
+                        continue
+
+                source_results.append(source_result)
 
             except ValueError as e:
                 logger.error(f"Invalid source {source}: {e}")
-                raise HTTPException(status_code=400, detail=str(e))
+                source_result.failure_count += 1
+                source_result.errors.append(str(e))
+                source_results.append(source_result)
+                continue
+
             except Exception as e:
-                logger.error(f"Failed to fetch jobs from {source}: {e}")
-                # Continue with other sources even if one fails
+                logger.error(f"Failed to initialize fetcher for {source}: {e}")
+                source_result.failure_count += 1
+                source_result.errors.append(f"Failed to initialize fetcher: {str(e)}")
+                source_results.append(source_result)
                 continue
 
         db.commit()
 
-        return {
-            "message": "Jobs fetched successfully",
-            "count": total_fetched,
-            "sources": request.sources,
-            "force_refresh": request.force_refresh,
-        }
+        fetch_time = time.time() - start_time
+
+        return JobFetchResponse(
+            message=f"Jobs fetched successfully from {len(source_results)} sources",
+            total_fetched=total_fetched,
+            total_skipped=total_skipped,
+            sources=source_results,
+            force_refresh=request.force_refresh,
+            fetch_time_seconds=round(fetch_time, 2),
+        )
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         logger.error(f"Failed to fetch jobs: {e}")

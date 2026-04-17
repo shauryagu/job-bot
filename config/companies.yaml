@@ -10,6 +10,13 @@ companies:
     locations:
       - "New York"
       - "Remote"
+    fetch_interval_hours: 6
+    rate_limit:
+      requests: 100
+      period: 60
+    fetch_params:
+      departments: ["Engineering", "Product"]
+      locations: ["New York", "Remote"]
     notes: "Strong technical team, product-driven"
 
   - name: "Example Company B"
@@ -18,6 +25,13 @@ companies:
     careers_url: "https://example-b.com/jobs"
     locations:
       - "New York"
+    fetch_interval_hours: 6
+    rate_limit:
+      requests: 100
+      period: 60
+    fetch_params:
+      departments: ["Engineering"]
+      locations: ["New York"]
     notes: "ML infrastructure focus"
 
   # High Priority Companies (Priority: 4)
@@ -27,6 +41,13 @@ companies:
     careers_url: "https://example-c.com/careers"
     locations:
       - "Remote"
+    fetch_interval_hours: 12
+    rate_limit:
+      requests: 50
+      period: 60
+    fetch_params:
+      departments: ["Platform", "Infrastructure"]
+      locations: ["Remote"]
     notes: "Platform engineering team"
 
   # Moderate Priority Companies (Priority: 3)
@@ -36,7 +57,14 @@ companies:
     careers_url: "https://example-d.com/careers"
     locations:
       - "New York"
-      "Remote"
+      - "Remote"
+    fetch_interval_hours: 12
+    rate_limit:
+      requests: 50
+      period: 60
+    fetch_params:
+      departments: ["Engineering"]
+      locations: ["New York", "Remote"]
     notes: "Solid infrastructure team"
 
   # Backup Companies (Priority: 2)
@@ -46,6 +74,13 @@ companies:
     careers_url: "https://example-e.com/careers"
     locations:
       - "New York"
+    fetch_interval_hours: 24
+    rate_limit:
+      requests: 25
+      period: 60
+    fetch_params:
+      departments: ["Engineering"]
+      locations: ["New York"]
     notes: "Enterprise backend role"
 
 # Priority Levels:

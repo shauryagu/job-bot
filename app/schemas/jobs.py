@@ -41,3 +41,24 @@ class JobFetchRequest(BaseModel):
 
     sources: List[str] = Field(default=["greenhouse", "lever", "ashby"])
     force_refresh: bool = Field(default=False)
+    companies: Optional[List[str]] = Field(default=None, description="Specific companies to fetch from")
+
+
+class JobFetchSourceResult(BaseModel):
+    """Result for a single source in fetch operation."""
+
+    source: str
+    success_count: int = 0
+    failure_count: int = 0
+    errors: List[str] = Field(default_factory=list)
+
+
+class JobFetchResponse(BaseModel):
+    """Job fetch response schema."""
+
+    message: str
+    total_fetched: int = 0
+    total_skipped: int = 0
+    sources: List[JobFetchSourceResult] = Field(default_factory=list)
+    force_refresh: bool = False
+    fetch_time_seconds: float = 0.0
