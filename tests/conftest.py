@@ -8,9 +8,45 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
-from main import app
+from fastapi import FastAPI
 from app.db.base import Base
-from app.models import job, application, contact, outreach, profile, tracker
+
+# Import all models to ensure they're registered with Base
+from app.models import job, application, contact, outreach, profile, tracker, company
+
+# Import routers
+from app.api import jobs, applications, outreach, tracker, profile, companies
+
+# Create test-specific app without lifespan
+test_app = FastAPI()
+
+# Add CORS middleware
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+test_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+test_app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
+test_app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
+test_app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
+test_app.include_router(tracker.router, prefix="/api/tracker", tags=["tracker"])
+test_app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
+test_app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
+
+# Add root and health endpoints
+@test_app.get("/")
+async def root():
+    return {"name": settings.app_name, "version": settings.app_version, "status": "running"}
+
+@test_app.get("/health")
+async def health_check():
+    return {"status": "healthy"}, company
 
 
 # Test database URL
@@ -38,6 +74,9 @@ def db_session():
 
     try:
         yield session
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
         # Drop all tables after test
@@ -61,12 +100,15 @@ def client(db_session):
         finally:
             pass
 
-    # Override the dependency
+    # Override the dependency BEFORE creating the client
     from app.db import session as db_session_module
-    app.dependency_overrides[db_session_module.get_db] = override_get_db
+    test_app.dependency_overrides[db_session_module.get_db] = override_get_db
+
+    # Create client with the override in place
+    test_client = TestClient(test_app)
 
     try:
-        yield TestClient(app)
+        yield test_client
     finally:
         # Clean up override
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()

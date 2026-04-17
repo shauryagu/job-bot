@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.db.init_db import init_database
-from app.api import jobs, applications, outreach, tracker, profile
+from app.api import jobs, applications, outreach, tracker, profile, companies
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -56,6 +56,7 @@ app.include_router(applications.router, prefix="/api/applications", tags=["appli
 app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
 app.include_router(tracker.router, prefix="/api/tracker", tags=["tracker"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
+app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
 
 
 @app.get("/")
