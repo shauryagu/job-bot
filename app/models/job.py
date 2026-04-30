@@ -88,6 +88,7 @@ class JobNormalized(BaseModel):
     __tablename__ = "jobs_normalized"
 
     raw_job_id = Column(Integer, ForeignKey("jobs_raw.id"), nullable=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     company = Column(String, nullable=False, index=True)
     role = Column(String, nullable=False)
     title_bucket = Column(String)
@@ -110,6 +111,9 @@ class JobNormalized(BaseModel):
 
     # Relationship to raw job
     raw_job = relationship("JobRaw", back_populates="normalized_jobs")
+
+    # Relationship to company
+    company_record = relationship("Company", back_populates="jobs")
 
     def __repr__(self):
         return f"<JobNormalized(id={self.id}, company={self.company}, role={self.role}, score={self.priority_score})>"

@@ -8,15 +8,57 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
-from main import app
+from fastapi import FastAPI
 from app.db.base import Base
-# Import model classes to register them with SQLAlchemy Base metadata
+
+# Import model classes to register them with SQLAlchemy Base metadata.
+# Importing the explicit classes (in addition to the module-level imports below)
+# guarantees that every table is attached to Base.metadata before tests run.
 from app.models.job import JobRaw, JobNormalized
 from app.models.application import Application
 from app.models.profile import UserProfile
 from app.models.tracker import TrackerEntry
 from app.models.contact import Contact
 from app.models.outreach import Outreach
+from app.models import company  # noqa: F401  (registers Company model)
+
+# Import routers used by the test FastAPI app
+from app.api import jobs, applications, outreach, tracker, profile, companies
+
+# CORS middleware imports (kept at top-level alongside other framework imports)
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+
+# Build a test-specific FastAPI app (no lifespan / startup hooks) so tests
+# don't trigger real DB initialization or background tasks.
+test_app = FastAPI()
+
+test_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount all API routers on the test app
+test_app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
+test_app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
+test_app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
+test_app.include_router(tracker.router, prefix="/api/tracker", tags=["tracker"])
+test_app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
+test_app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
+
+
+# Root and health endpoints, mirroring the production app
+@test_app.get("/")
+async def root():
+    return {"name": settings.app_name, "version": settings.app_version, "status": "running"}
+
+
+@test_app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 
 # Test database URL
@@ -44,6 +86,9 @@ def db_session():
 
     try:
         yield session
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
         # Drop all tables after test
@@ -67,12 +112,15 @@ def client(db_session):
         finally:
             pass
 
-    # Override the dependency
+    # Override the dependency BEFORE creating the client
     from app.db import session as db_session_module
-    app.dependency_overrides[db_session_module.get_db] = override_get_db
+    test_app.dependency_overrides[db_session_module.get_db] = override_get_db
+
+    # Create client with the override in place
+    test_client = TestClient(test_app)
 
     try:
-        yield TestClient(app)
+        yield test_client
     finally:
         # Clean up override
-        app.dependency_overrides.clear()
+        test_app.dependency_overrides.clear()

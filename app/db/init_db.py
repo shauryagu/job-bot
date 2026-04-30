@@ -10,7 +10,7 @@ from app.db.session import engine, SessionLocal, init_db
 from app.db.base import Base
 from app.core.logging import logger
 from app.core.config import settings
-from app.models import job, application, contact, outreach, profile, tracker
+from app.models import job, application, contact, outreach, profile, tracker, company
 
 
 async def check_database_health() -> bool:
