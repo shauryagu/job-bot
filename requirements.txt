@@ -19,3 +19,10 @@ python-multipart>=0.0.6
 loguru>=0.7.0
 passlib[bcrypt]>=1.7.4
 python-jose[cryptography]>=3.3.0
+
+# PostgreSQL drivers
+psycopg2-binary>=2.9.9  # Synchronous PostgreSQL adapter
+asyncpg>=0.29.0          # Asynchronous PostgreSQL adapter
+
+# SQLite async driver (for development/fallback)
+aiosqlite>=0.19.0        # Asynchronous SQLite adapter

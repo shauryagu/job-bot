@@ -25,9 +25,34 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(
         default="sqlite:///./data/database/job_bot.db",
-        description="Database connection URL"
+        description="Database connection URL (SQLite for development)"
     )
     database_echo: bool = Field(default=False, description="Echo SQL queries")
+
+    # PostgreSQL Configuration
+    # All credentials loaded from environment variables for security
+    postgres_host: str = Field(default="localhost", description="PostgreSQL server hostname")
+    postgres_port: int = Field(default=5432, description="PostgreSQL server port")
+    postgres_user: str = Field(default="jobbot", description="PostgreSQL username")
+    postgres_password: str = Field(default="", description="PostgreSQL password (REQUIRED for production)")
+    postgres_database: str = Field(default="jobbot", description="PostgreSQL database name")
+
+    # PostgreSQL SSL Configuration
+    postgres_ssl_mode: str = Field(default="prefer", description="SSL mode for PostgreSQL connection")
+    postgres_ssl_cert: str = Field(default="", description="Path to SSL client certificate")
+    postgres_ssl_key: str = Field(default="", description="Path to SSL client key")
+    postgres_ssl_root_cert: str = Field(default="", description="Path to SSL root certificate")
+
+    # PostgreSQL Connection Pooling
+    postgres_pool_size: int = Field(default=20, description="Connection pool size")
+    postgres_max_overflow: int = Field(default=30, description="Max overflow connections")
+    postgres_pool_timeout: int = Field(default=30, description="Pool timeout in seconds")
+    postgres_pool_recycle: int = Field(default=3600, description="Recycle connections after N seconds")
+    postgres_pool_pre_ping: bool = Field(default=True, description="Test connections before use")
+
+    # PostgreSQL Timeouts
+    postgres_connect_timeout: int = Field(default=10, description="Connection timeout in seconds")
+    postgres_statement_timeout: int = Field(default=30000, description="Statement timeout in milliseconds")
 
     # Security
     secret_key: str = Field(default="change-me-in-production", description="Secret key for JWT")
