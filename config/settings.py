@@ -100,6 +100,18 @@ class Settings(BaseSettings):
     cache_ttl: int = Field(default=3600, description="Cache time-to-live in seconds")
     enable_cache: bool = Field(default=True, description="Enable caching")
 
+    # Redis Configuration
+    redis_host: str = Field(default="localhost", description="Redis server hostname")
+    redis_port: int = Field(default=6379, description="Redis server port")
+    redis_db: int = Field(default=0, description="Redis database number")
+    redis_password: str = Field(default="", description="Redis password (optional)")
+
+    # Qdrant Configuration
+    qdrant_host: str = Field(default="localhost", description="Qdrant server hostname")
+    qdrant_port: int = Field(default=6333, description="Qdrant REST API port")
+    qdrant_grpc_port: int = Field(default=6334, description="Qdrant gRPC port")
+    qdrant_api_key: str = Field(default="", description="Qdrant API key (optional)")
+
     # Job Fetching
     fetch_interval_hours: int = Field(default=6, description="Job fetch interval in hours")
     max_jobs_per_source: int = Field(default=100, description="Maximum jobs per source")
